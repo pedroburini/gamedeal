@@ -3,7 +3,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from app.database import engine, Base
 from app.routers import users, games, prices
-from app.scheduler import start_scheduler
+from app.scheduler import start_scheduler, run_full_sync
+import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 @asynccontextmanager
@@ -11,6 +15,7 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     start_scheduler()
+    asyncio.create_task(run_full_sync())
     yield
 
 
