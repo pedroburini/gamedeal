@@ -1,0 +1,78 @@
+import re
+import httpx
+from bs4 import BeautifulSoup
+
+
+STEAM_SEARCH_URL = "https://store.steampowered.com/search/results"
+
+
+def slugify(name: str) -> str:
+    """Converte nome do jogo para slug estilo Nuuvem."""
+    name = name.lower()
+    name = re.sub(r"[™®©]", "", name)
+    name = re.sub(r"[^a-z0-9\s-]", "", name)
+    name = re.sub(r"\s+", "-", name.strip())
+    name = re.sub(r"-+", "-", name)
+    return name
+
+
+async def fetch_top_sellers(count: int = 50) -> list[dict]:
+    """Retorna lista de {title, steam_app_id, nuuvem_slug} dos top sellers da Steam."""
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/124.0.0.0 Safari/537.36"
+        ),
+        "Accept-Language": "pt-BR,pt;q=0.9"
+    }
+
+    params = {
+        "filter": "topsellers",
+        "cc": "br",
+        "l": "portuguese",
+        "count": count,
+        "json": 1
+    }
+
+    games = []
+
+    async with httpx.AsyncClient() as client:
+        try:
+            resp = await client.get(
+                STEAM_SEARCH_URL,
+                params=params,
+                headers=headers,
+                timeout=15.0
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            print(f"[catalog] Erro ao buscar top sellers: {e}")
+            return []
+
+    items = data.get("items", [])
+
+    for item in items:
+        try:
+            soup = BeautifulSoup(item.get("name", ""), "html.parser")
+            title = soup.get_text(strip=True) or item.get("name", "")
+
+            logo = item.get("logo", "")
+            # Extrai app_id da URL da imagem (ex: /steam/apps/1091500/...)
+            match = re.search(r"/apps/(\d+)/", logo)
+            if not match:
+                continue
+            steam_app_id = match.group(1)
+
+            nuuvem_slug = slugify(title)
+
+            games.append({
+                "title": title,
+                "steam_app_id": steam_app_id,
+                "nuuvem_slug": nuuvem_slug
+            })
+        except Exception:
+            continue
+
+    return games
