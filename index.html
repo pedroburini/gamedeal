@@ -1,0 +1,781 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GameDeal</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f0f;
+      --surface: #141414;
+      --surface2: #1a1a1a;
+      --border: #222;
+      --border2: #2a2a2a;
+      --text: #d0d0d0;
+      --text-muted: #555;
+      --text-dim: #888;
+      --mono: 'Courier New', Courier, monospace;
+      --sans: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--sans);
+      min-height: 100vh;
+    }
+
+    /* ── HEADER ── */
+    header {
+      padding: 1.25rem 2rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .logo {
+      font-family: var(--mono);
+      font-size: 1rem;
+      color: var(--text);
+      letter-spacing: 0.05em;
+    }
+
+    .logo span { color: var(--text-muted); }
+
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+
+    .btn {
+      padding: 0.45rem 1rem;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      font-family: var(--sans);
+    }
+
+    .btn:hover { background: #222; color: var(--text); }
+    .btn.primary { color: var(--text); border-color: #333; }
+    .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── TABS ── */
+    .tabs {
+      display: flex;
+      gap: 0;
+      padding: 0 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .tab-btn {
+      padding: 0.75rem 1.25rem;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: color 0.15s, border-color 0.15s;
+      font-family: var(--sans);
+      margin-bottom: -1px;
+    }
+
+    .tab-btn:hover { color: var(--text-dim); }
+    .tab-btn.active { color: var(--text); border-bottom-color: #444; }
+
+    /* ── MAIN ── */
+    main { padding: 2rem; max-width: 1100px; margin: 0 auto; }
+
+    /* ── STATUS BAR ── */
+    .status-bar {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 1.5rem;
+      font-family: var(--mono);
+    }
+
+    /* ── DEALS GRID ── */
+    .deals-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .deal-card {
+      background: var(--surface);
+      padding: 1rem;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .deal-card:hover { background: var(--surface2); }
+
+    .deal-cover {
+      width: 100%;
+      aspect-ratio: 460 / 215;
+      object-fit: cover;
+      border-radius: 4px;
+      background: var(--surface2);
+    }
+
+    .deal-title {
+      font-size: 0.85rem;
+      color: var(--text);
+      line-height: 1.3;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .deal-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: auto;
+    }
+
+    .deal-store {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      font-family: var(--mono);
+    }
+
+    .deal-price-wrap { text-align: right; }
+
+    .deal-discount {
+      font-family: var(--mono);
+      font-size: 0.72rem;
+      color: #6a9;
+      letter-spacing: 0.02em;
+    }
+
+    .deal-price {
+      font-family: var(--mono);
+      font-size: 0.9rem;
+      color: var(--text);
+    }
+
+    .deal-original {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      text-decoration: line-through;
+    }
+
+    /* ── MODAL ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.7);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+
+    .modal-overlay.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 10px;
+      padding: 1.75rem;
+      width: 100%;
+      max-width: 420px;
+      position: relative;
+    }
+
+    .modal h2 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      margin-bottom: 1.25rem;
+      color: var(--text);
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 1.1rem;
+      cursor: pointer;
+    }
+
+    .modal-close:hover { color: var(--text); }
+
+    .field { margin-bottom: 1rem; }
+
+    .field label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .field input {
+      width: 100%;
+      padding: 0.6rem 0.85rem;
+      background: var(--bg);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: var(--sans);
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .field input:focus { border-color: #444; }
+
+    .modal-error {
+      font-size: 0.75rem;
+      color: #a66;
+      margin-bottom: 0.75rem;
+      min-height: 1rem;
+    }
+
+    .modal-footer {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 1.25rem;
+    }
+
+    /* ── GAME DETAIL MODAL ── */
+    .game-detail { max-width: 520px; }
+
+    .game-detail-cover {
+      width: 100%;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+      background: var(--surface2);
+    }
+
+    .game-detail h2 { margin-bottom: 0.5rem; }
+
+    .price-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.82rem;
+    }
+
+    .price-table th {
+      text-align: left;
+      color: var(--text-muted);
+      font-weight: 400;
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 0.35rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+    }
+
+    .price-table td {
+      padding: 0.5rem 0.5rem;
+      border-bottom: 1px solid var(--border);
+      font-family: var(--mono);
+      color: var(--text);
+    }
+
+    .price-table td.muted { color: var(--text-muted); }
+    .price-table td.green { color: #6a9; }
+
+    /* ── WATCHLIST ── */
+    .watchlist-list { display: flex; flex-direction: column; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+
+    .watchlist-item {
+      background: var(--surface);
+      padding: 0.85rem 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .watchlist-item img {
+      width: 80px;
+      border-radius: 3px;
+      background: var(--surface2);
+    }
+
+    .watchlist-info { flex: 1; }
+
+    .watchlist-title {
+      font-size: 0.875rem;
+      color: var(--text);
+      margin-bottom: 0.25rem;
+    }
+
+    .watchlist-target {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    .watchlist-remove {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.25rem;
+      transition: color 0.15s;
+    }
+
+    .watchlist-remove:hover { color: #a66; }
+
+    /* ── ADD GAME ── */
+    .add-game-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 1.5rem;
+    }
+
+    .add-game-bar input {
+      flex: 1;
+      padding: 0.6rem 0.85rem;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.875rem;
+      font-family: var(--sans);
+      outline: none;
+    }
+
+    .add-game-bar input:focus { border-color: #444; }
+    .add-game-bar input::placeholder { color: var(--text-muted); }
+
+    /* ── EMPTY STATE ── */
+    .empty {
+      padding: 3rem;
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+
+    /* ── LOADING ── */
+    .loading-text {
+      font-family: var(--mono);
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      padding: 2rem 0;
+    }
+
+    /* ── USER BADGE ── */
+    .user-badge {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-family: var(--mono);
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 600px) {
+      header { padding: 1rem; }
+      main { padding: 1rem; }
+      .tabs { padding: 0 1rem; }
+      .deals-grid { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">game<span>//</span>deal</div>
+  <div class="header-actions">
+    <span class="user-badge" id="userBadge"></span>
+    <button class="btn" id="authBtn" onclick="openAuth()">Entrar</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" id="tabDeals" onclick="switchTab('deals')">Promoções</button>
+  <button class="tab-btn" id="tabWatchlist" onclick="switchTab('watchlist')">Minha Lista</button>
+  <button class="tab-btn" id="tabGames" onclick="switchTab('games')">Jogos</button>
+</div>
+
+<main>
+  <!-- DEALS -->
+  <div id="viewDeals">
+    <div class="status-bar" id="dealsStatus">carregando promoções...</div>
+    <div class="deals-grid" id="dealsGrid"></div>
+  </div>
+
+  <!-- WATCHLIST -->
+  <div id="viewWatchlist" style="display:none;">
+    <div class="status-bar" id="watchlistStatus"></div>
+    <div id="watchlistContent"></div>
+  </div>
+
+  <!-- GAMES -->
+  <div id="viewGames" style="display:none;">
+    <div class="add-game-bar">
+      <input id="gameTitle" placeholder="Título do jogo" />
+      <input id="gameSteamId" placeholder="Steam App ID (ex: 1091500)" style="max-width:200px;" />
+      <input id="gameNuuvem" placeholder="Slug Nuuvem (ex: cyberpunk-2077)" style="max-width:220px;" />
+      <button class="btn primary" onclick="addGame()">Adicionar</button>
+    </div>
+    <div class="status-bar" id="gamesStatus"></div>
+    <div id="gamesList"></div>
+  </div>
+</main>
+
+<!-- AUTH MODAL -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('authModal')">×</button>
+    <h2 id="authTitle">Entrar</h2>
+    <div class="field"><label>Username</label><input id="authUsername" type="text" /></div>
+    <div class="field" id="authEmailField" style="display:none;"><label>Email</label><input id="authEmail" type="email" /></div>
+    <div class="field"><label>Senha</label><input id="authPassword" type="password" /></div>
+    <div class="modal-error" id="authError"></div>
+    <div class="modal-footer">
+      <button class="btn" onclick="toggleAuthMode()" id="authToggle">Criar conta</button>
+      <button class="btn primary" onclick="submitAuth()" id="authSubmit">Entrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- GAME DETAIL MODAL -->
+<div class="modal-overlay" id="gameDetailModal">
+  <div class="modal game-detail">
+    <button class="modal-close" onclick="closeModal('gameDetailModal')">×</button>
+    <div id="gameDetailContent"></div>
+  </div>
+</div>
+
+<script>
+  const API = 'https://gamedeal-production-a966.up.railway.app/api';
+  let token = localStorage.getItem('gd_token');
+  let username = localStorage.getItem('gd_username');
+  let authMode = 'login';
+
+  // ── AUTH STATE ─────────────────────────────────────────
+  function updateAuthUI() {
+    const btn = document.getElementById('authBtn');
+    const badge = document.getElementById('userBadge');
+    if (token) {
+      badge.textContent = username || '';
+      btn.textContent = 'Sair';
+      btn.onclick = logout;
+    } else {
+      badge.textContent = '';
+      btn.textContent = 'Entrar';
+      btn.onclick = openAuth;
+    }
+  }
+
+  function logout() {
+    token = null;
+    username = null;
+    localStorage.removeItem('gd_token');
+    localStorage.removeItem('gd_username');
+    updateAuthUI();
+    switchTab('deals');
+  }
+
+  function openAuth() { document.getElementById('authModal').classList.add('open'); }
+  function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+  function toggleAuthMode() {
+    authMode = authMode === 'login' ? 'register' : 'login';
+    const isReg = authMode === 'register';
+    document.getElementById('authTitle').textContent = isReg ? 'Criar conta' : 'Entrar';
+    document.getElementById('authSubmit').textContent = isReg ? 'Criar conta' : 'Entrar';
+    document.getElementById('authToggle').textContent = isReg ? 'Já tenho conta' : 'Criar conta';
+    document.getElementById('authEmailField').style.display = isReg ? 'block' : 'none';
+    document.getElementById('authError').textContent = '';
+  }
+
+  async function submitAuth() {
+    const u = document.getElementById('authUsername').value.trim();
+    const p = document.getElementById('authPassword').value;
+    const e = document.getElementById('authEmail').value.trim();
+    const errEl = document.getElementById('authError');
+    errEl.textContent = '';
+
+    try {
+      if (authMode === 'register') {
+        const res = await fetch(`${API}/users/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: u, email: e, password: p })
+        });
+        if (!res.ok) { const d = await res.json(); errEl.textContent = d.detail || 'Erro ao criar conta'; return; }
+        authMode = 'login';
+        toggleAuthMode();
+      }
+
+      const form = new URLSearchParams();
+      form.append('username', u);
+      form.append('password', p);
+      const res = await fetch(`${API}/users/login`, { method: 'POST', body: form });
+      if (!res.ok) { errEl.textContent = 'Credenciais inválidas'; return; }
+      const data = await res.json();
+      token = data.access_token;
+      username = u;
+      localStorage.setItem('gd_token', token);
+      localStorage.setItem('gd_username', username);
+      closeModal('authModal');
+      updateAuthUI();
+    } catch {
+      errEl.textContent = 'Erro de conexão';
+    }
+  }
+
+  // ── TABS ───────────────────────────────────────────────
+  function switchTab(tab) {
+    ['deals','watchlist','games'].forEach(t => {
+      document.getElementById(`tab${t.charAt(0).toUpperCase()+t.slice(1)}`).classList.toggle('active', t === tab);
+      document.getElementById(`view${t.charAt(0).toUpperCase()+t.slice(1)}`).style.display = t === tab ? 'block' : 'none';
+    });
+    if (tab === 'deals') loadDeals();
+    if (tab === 'watchlist') loadWatchlist();
+    if (tab === 'games') loadGames();
+  }
+
+  // ── DEALS ──────────────────────────────────────────────
+  async function loadDeals() {
+    const grid = document.getElementById('dealsGrid');
+    const status = document.getElementById('dealsStatus');
+    grid.innerHTML = '';
+    status.textContent = 'carregando promoções...';
+
+    try {
+      const res = await fetch(`${API}/deals`);
+      const deals = await res.json();
+      if (!deals.length) { status.textContent = 'nenhuma promoção ativa no momento.'; return; }
+      status.textContent = `${deals.length} promoções ativas`;
+      deals.forEach(d => {
+        const card = document.createElement('div');
+        card.className = 'deal-card';
+        card.innerHTML = `
+          ${d.cover_url ? `<img class="deal-cover" src="${d.cover_url}" alt="${d.title}" loading="lazy" />` : ''}
+          <div class="deal-title">${d.title}</div>
+          <div class="deal-meta">
+            <span class="deal-store">${d.store}</span>
+            <div class="deal-price-wrap">
+              <div class="deal-discount">-${d.discount_percent}%</div>
+              <div class="deal-price">R$ ${d.price.toFixed(2).replace('.',',')}</div>
+              <div class="deal-original">R$ ${d.original_price.toFixed(2).replace('.',',')}</div>
+            </div>
+          </div>
+        `;
+        card.onclick = () => openGameDetail(d.game_id);
+        grid.appendChild(card);
+      });
+    } catch {
+      status.textContent = 'erro ao carregar promoções.';
+    }
+  }
+
+  // ── GAME DETAIL ────────────────────────────────────────
+  async function openGameDetail(gameId) {
+    document.getElementById('gameDetailContent').innerHTML = '<div class="loading-text">carregando...</div>';
+    document.getElementById('gameDetailModal').classList.add('open');
+
+    try {
+      const [gameRes, reportRes] = await Promise.all([
+        fetch(`${API}/games/${gameId}`),
+        fetch(`${API}/games/${gameId}/report`)
+      ]);
+      const game = await gameRes.json();
+      const report = await reportRes.json();
+
+      const latestByStore = {};
+      report.history.forEach(h => { if (!latestByStore[h.store]) latestByStore[h.store] = h; });
+
+      const rows = Object.entries(latestByStore).map(([store, h]) => `
+        <tr>
+          <td>${store}</td>
+          <td>${h.price != null ? 'R$ ' + h.price.toFixed(2).replace('.',',') : '—'}</td>
+          <td class="${h.discount_percent > 0 ? 'green' : 'muted'}">${h.discount_percent > 0 ? '-' + h.discount_percent + '%' : '—'}</td>
+        </tr>
+      `).join('');
+
+      document.getElementById('gameDetailContent').innerHTML = `
+        ${game.cover_url ? `<img class="game-detail-cover" src="${game.cover_url}" alt="${game.title}" />` : ''}
+        <h2>${game.title}</h2>
+        <table class="price-table">
+          <thead><tr><th>Loja</th><th>Preço atual</th><th>Desconto</th></tr></thead>
+          <tbody>${rows || '<tr><td colspan="3" class="muted">sem dados ainda</td></tr>'}</tbody>
+        </table>
+        <div style="font-size:0.75rem;color:var(--text-muted);font-family:var(--mono);">
+          menor preço histórico: ${report.lowest_price != null ? 'R$ ' + report.lowest_price.toFixed(2).replace('.',',') + ' (' + report.lowest_price_store + ')' : '—'}
+        </div>
+        ${token ? `<div style="margin-top:1rem;"><button class="btn" onclick="addToWatchlist(${game.id})">+ Adicionar à lista</button></div>` : ''}
+      `;
+    } catch {
+      document.getElementById('gameDetailContent').innerHTML = '<div class="loading-text">erro ao carregar.</div>';
+    }
+  }
+
+  // ── WATCHLIST ──────────────────────────────────────────
+  async function loadWatchlist() {
+    const content = document.getElementById('watchlistContent');
+    const status = document.getElementById('watchlistStatus');
+    content.innerHTML = '';
+
+    if (!token) {
+      content.innerHTML = '<div class="empty">Entre na sua conta para ver sua lista de jogos.</div>';
+      return;
+    }
+
+    status.textContent = 'carregando lista...';
+    try {
+      const res = await fetch(`${API}/watchlist`, { headers: { Authorization: `Bearer ${token}` } });
+      const items = await res.json();
+      status.textContent = `${items.length} jogo(s) na lista`;
+
+      if (!items.length) {
+        content.innerHTML = '<div class="empty">Sua lista está vazia. Adicione jogos pela aba Jogos.</div>';
+        return;
+      }
+
+      const list = document.createElement('div');
+      list.className = 'watchlist-list';
+      items.forEach(item => {
+        const el = document.createElement('div');
+        el.className = 'watchlist-item';
+        el.innerHTML = `
+          ${item.game.cover_url ? `<img src="${item.game.cover_url}" alt="${item.game.title}" />` : ''}
+          <div class="watchlist-info">
+            <div class="watchlist-title">${item.game.title}</div>
+            ${item.target_price ? `<div class="watchlist-target">alerta: R$ ${item.target_price.toFixed(2).replace('.',',')}</div>` : ''}
+          </div>
+          <button class="watchlist-remove" onclick="removeFromWatchlist(${item.id})">×</button>
+        `;
+        list.appendChild(el);
+      });
+      content.appendChild(list);
+    } catch {
+      status.textContent = 'erro ao carregar lista.';
+    }
+  }
+
+  async function addToWatchlist(gameId) {
+    if (!token) { openAuth(); return; }
+    try {
+      await fetch(`${API}/watchlist`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ game_id: gameId, target_price: null })
+      });
+      closeModal('gameDetailModal');
+      switchTab('watchlist');
+    } catch { alert('Erro ao adicionar à lista.'); }
+  }
+
+  async function removeFromWatchlist(itemId) {
+    if (!token) return;
+    try {
+      await fetch(`${API}/watchlist/${itemId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+      loadWatchlist();
+    } catch { alert('Erro ao remover.'); }
+  }
+
+  // ── GAMES ──────────────────────────────────────────────
+  async function loadGames() {
+    const list = document.getElementById('gamesList');
+    const status = document.getElementById('gamesStatus');
+    list.innerHTML = '';
+
+    if (!token) {
+      list.innerHTML = '<div class="empty">Entre na sua conta para gerenciar jogos.</div>';
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API}/games/`);
+      const games = await res.json();
+      status.textContent = `${games.length} jogo(s) cadastrado(s)`;
+
+      if (!games.length) {
+        list.innerHTML = '<div class="empty">Nenhum jogo cadastrado ainda.</div>';
+        return;
+      }
+
+      const wl = document.createElement('div');
+      wl.className = 'watchlist-list';
+      games.forEach(g => {
+        const el = document.createElement('div');
+        el.className = 'watchlist-item';
+        el.innerHTML = `
+          ${g.cover_url ? `<img src="${g.cover_url}" alt="${g.title}" />` : ''}
+          <div class="watchlist-info">
+            <div class="watchlist-title">${g.title}</div>
+            <div class="watchlist-target">${[g.steam_app_id ? 'steam:'+g.steam_app_id : '', g.nuuvem_slug ? 'nuuvem:'+g.nuuvem_slug : ''].filter(Boolean).join('  ')}</div>
+          </div>
+          <button class="btn" onclick="fetchPrices(${g.id})">Atualizar</button>
+        `;
+        wl.appendChild(el);
+      });
+      list.appendChild(wl);
+    } catch {
+      status.textContent = 'erro ao carregar jogos.';
+    }
+  }
+
+  async function addGame() {
+    if (!token) { openAuth(); return; }
+    const title = document.getElementById('gameTitle').value.trim();
+    const steamId = document.getElementById('gameSteamId').value.trim();
+    const nuuvem = document.getElementById('gameNuuvem').value.trim();
+    if (!title) return;
+
+    try {
+      const res = await fetch(`${API}/games/`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ title, steam_app_id: steamId || null, nuuvem_slug: nuuvem || null })
+      });
+      if (!res.ok) { alert('Erro ao adicionar jogo.'); return; }
+      const game = await res.json();
+      document.getElementById('gameTitle').value = '';
+      document.getElementById('gameSteamId').value = '';
+      document.getElementById('gameNuuvem').value = '';
+      await fetchPrices(game.id);
+      loadGames();
+    } catch { alert('Erro ao adicionar jogo.'); }
+  }
+
+  async function fetchPrices(gameId) {
+    if (!token) return;
+    try {
+      await fetch(`${API}/games/${gameId}/fetch-prices`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } });
+      loadGames();
+      loadDeals();
+    } catch { alert('Erro ao atualizar preços.'); }
+  }
+
+  // ── INIT ───────────────────────────────────────────────
+  updateAuthUI();
+  loadDeals();
+
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') {
+      document.querySelectorAll('.modal-overlay.open').forEach(m => m.classList.remove('open'));
+    }
+  });
+</script>
+</body>
+</html>
