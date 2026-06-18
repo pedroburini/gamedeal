@@ -4,7 +4,7 @@ from app.database import AsyncSessionLocal
 from app.models import Game, PriceSnapshot
 from app.scrapers.steam import get_steam_price
 from app.scrapers.nuuvem import get_nuuvem_price
-from app.scrapers.catalog import fetch_top_sellers
+from app.scrapers.catalog import fetch_on_sale, fetch_top_sellers
 from datetime import datetime, timezone
 import logging
 
@@ -14,29 +14,41 @@ scheduler = AsyncIOScheduler()
 
 
 async def sync_catalog():
-    """Busca top sellers da Steam e cadastra jogos novos no banco."""
+    """Busca jogos em promoção + top sellers e cadastra os novos no banco."""
     logger.info("Scheduler: sincronizando catálogo...")
-    games = await fetch_top_sellers(count=50)
+
+    on_sale = await fetch_on_sale(count=200)
+    top = await fetch_top_sellers(count=50)
+
+    # Merge sem duplicatas por steam_app_id
+    seen = set()
+    games = []
+    for g in on_sale + top:
+        if g["steam_app_id"] not in seen:
+            seen.add(g["steam_app_id"])
+            games.append(g)
+
     if not games:
         logger.warning("Scheduler: nenhum jogo retornado do catálogo.")
         return
 
     async with AsyncSessionLocal() as db:
+        added = 0
         for g in games:
             result = await db.execute(
                 select(Game).where(Game.steam_app_id == g["steam_app_id"])
             )
             if result.scalar_one_or_none():
-                continue  # já existe
-            new_game = Game(
+                continue
+            db.add(Game(
                 title=g["title"],
                 steam_app_id=g["steam_app_id"],
                 nuuvem_slug=g["nuuvem_slug"]
-            )
-            db.add(new_game)
+            ))
+            added += 1
         await db.commit()
 
-    logger.info(f"Scheduler: catálogo sincronizado — {len(games)} jogos processados.")
+    logger.info(f"Scheduler: {added} jogos novos adicionados ({len(games)} processados).")
 
 
 async def fetch_all_prices():
@@ -84,15 +96,11 @@ async def fetch_all_prices():
 
 
 async def run_full_sync():
-    """Sincroniza catálogo e coleta preços em sequência."""
     await sync_catalog()
     await fetch_all_prices()
 
 
 def start_scheduler():
-    # Sincroniza catálogo + preços a cada 6 horas
     scheduler.add_job(run_full_sync, "interval", hours=6, id="full_sync")
-    # Roda imediatamente na inicialização
-    scheduler.add_job(run_full_sync, "date", id="full_sync_startup")
     scheduler.start()
     logger.info("Scheduler iniciado — sincronização a cada 6 horas.")
