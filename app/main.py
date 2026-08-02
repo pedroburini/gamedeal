@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi import Response
 from contextlib import asynccontextmanager
 from app.database import engine, Base
 from app.routers import users, games, prices
@@ -32,6 +33,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.head("/")
+async def head_root():
+    return Response(status_code=200)
 
 app.include_router(users.router, prefix="/api")
 app.include_router(games.router, prefix="/api")
