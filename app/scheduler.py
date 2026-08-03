@@ -7,6 +7,7 @@ from app.scrapers.nuuvem import get_nuuvem_price
 from app.scrapers.catalog import fetch_on_sale, fetch_top_sellers
 from datetime import datetime, timezone
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -52,46 +53,50 @@ async def sync_catalog():
 
 
 async def fetch_all_prices():
-    """Coleta preços de todos os jogos cadastrados."""
     logger.info("Scheduler: iniciando coleta de preços...")
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Game))
         games = result.scalars().all()
 
-        now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc)
+    BATCH_SIZE = 10
 
-        for game in games:
-            if game.steam_app_id:
-                data = await get_steam_price(game.steam_app_id)
-                if data:
-                    if not game.cover_url and data.get("cover_url"):
-                        game.cover_url = data["cover_url"]
-                    db.add(PriceSnapshot(
-                        game_id=game.id,
-                        store="steam",
-                        price=data["price"],
-                        original_price=data["original_price"],
-                        discount_percent=data["discount_percent"],
-                        is_free=data["is_free"],
-                        captured_at=now
-                    ))
+    for i in range(0, len(games), BATCH_SIZE):
+        batch = games[i:i + BATCH_SIZE]
+        async with AsyncSessionLocal() as db:
+            for game in batch:
+                if game.steam_app_id:
+                    data = await get_steam_price(game.steam_app_id)
+                    if data:
+                        if not game.cover_url and data.get("cover_url"):
+                            game.cover_url = data["cover_url"]
+                        db.add(PriceSnapshot(
+                            game_id=game.id,
+                            store="steam",
+                            price=data["price"],
+                            original_price=data["original_price"],
+                            discount_percent=data["discount_percent"],
+                            is_free=data["is_free"],
+                            captured_at=now
+                        ))
 
-            if game.nuuvem_slug:
-                data = await get_nuuvem_price(game.nuuvem_slug)
-                if data:
-                    if not game.cover_url and data.get("cover_url"):
-                        game.cover_url = data["cover_url"]
-                    db.add(PriceSnapshot(
-                        game_id=game.id,
-                        store="nuuvem",
-                        price=data["price"],
-                        original_price=data["original_price"],
-                        discount_percent=data["discount_percent"],
-                        is_free=data["is_free"],
-                        captured_at=now
-                    ))
+                if game.nuuvem_slug:
+                    data = await get_nuuvem_price(game.nuuvem_slug)
+                    if data:
+                        if not game.cover_url and data.get("cover_url"):
+                            game.cover_url = data["cover_url"]
+                        db.add(PriceSnapshot(
+                            game_id=game.id,
+                            store="nuuvem",
+                            price=data["price"],
+                            original_price=data["original_price"],
+                            discount_percent=data["discount_percent"],
+                            is_free=data["is_free"],
+                            captured_at=now
+                        ))
+            await db.commit()
+        await asyncio.sleep(2)
 
-        await db.commit()
     logger.info("Scheduler: coleta de preços concluída.")
 
 
