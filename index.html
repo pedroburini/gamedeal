@@ -683,6 +683,25 @@
       const latestByStore = {};
       report.history.forEach(h => { if (!latestByStore[h.store]) latestByStore[h.store] = h; });
 
+      // Nuuvem não é mais sincronizada automaticamente pelo scheduler —
+      // busca o preço em tempo real só agora, que o usuário abriu o jogo.
+      if (game.nuuvem_slug) {
+        try {
+          const nuuvemRes = await fetch(`${API}/games/${gameId}/nuuvem-price`);
+          if (nuuvemRes.ok) {
+            const nuuvemData = await nuuvemRes.json();
+            latestByStore['nuuvem'] = {
+              store: 'nuuvem',
+              price: nuuvemData.price,
+              original_price: nuuvemData.original_price,
+              discount_percent: nuuvemData.discount_percent
+            };
+          }
+        } catch {
+          // segue sem o preço da Nuuvem se a consulta falhar
+        }
+      }
+
       const rows = Object.entries(latestByStore).map(([store, h]) => `
         <tr>
           <td>${store}</td>
