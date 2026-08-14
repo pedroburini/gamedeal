@@ -55,6 +55,8 @@ class PriceSnapshotOut(BaseModel):
 class GameWithPrices(BaseModel):
     id: int
     title: str
+    steam_app_id: Optional[str] = None
+    nuuvem_slug: Optional[str] = None
     cover_url: Optional[str] = None
     prices: list[PriceSnapshotOut] = []
 
