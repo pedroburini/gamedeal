@@ -111,3 +111,39 @@ async def fetch_prices(
         select(Game).options(selectinload(Game.prices)).where(Game.id == game_id)
     )
     return result.scalar_one()
+
+
+@router.get("/{game_id}/nuuvem-price")
+async def fetch_nuuvem_price_on_demand(
+    game_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Consulta o preço da Nuuvem em tempo real (sem autenticação).
+    Chamado pelo frontend só quando o usuário abre um jogo específico —
+    a Nuuvem NÃO é mais consultada automaticamente pelo scheduler."""
+    result = await db.execute(select(Game).where(Game.id == game_id))
+    game = result.scalar_one_or_none()
+    if not game:
+        raise HTTPException(status_code=404, detail="Jogo não encontrado")
+    if not game.nuuvem_slug:
+        raise HTTPException(status_code=404, detail="Jogo não disponível na Nuuvem")
+
+    data = await get_nuuvem_price(game.nuuvem_slug)
+    if not data:
+        raise HTTPException(status_code=404, detail="Preço não encontrado na Nuuvem")
+
+    now = datetime.now(timezone.utc)
+    if not game.cover_url and data.get("cover_url"):
+        game.cover_url = data["cover_url"]
+    db.add(PriceSnapshot(
+        game_id=game.id,
+        store="nuuvem",
+        price=data["price"],
+        original_price=data["original_price"],
+        discount_percent=data["discount_percent"],
+        is_free=data["is_free"],
+        captured_at=now
+    ))
+    await db.commit()
+
+    return data

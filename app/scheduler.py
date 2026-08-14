@@ -3,7 +3,6 @@ from sqlalchemy import select
 from app.database import AsyncSessionLocal
 from app.models import Game, PriceSnapshot
 from app.scrapers.steam import get_steam_price
-from app.scrapers.nuuvem import get_nuuvem_price
 from app.scrapers.catalog import fetch_on_sale, fetch_top_sellers
 from datetime import datetime, timezone
 import logging
@@ -13,13 +12,15 @@ logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler()
 
+MAX_CATALOG_SIZE = 50  # teto de jogos novos por sync
+
 
 async def sync_catalog():
-    """Busca jogos em promoção + top sellers e cadastra os novos no banco."""
+    """Busca jogos em promoção + top sellers e cadastra os novos no banco (máx. 50 por sync)."""
     logger.info("Scheduler: sincronizando catálogo...")
 
-    on_sale = await fetch_on_sale(count=200)
-    top = await fetch_top_sellers(count=50)
+    on_sale = await fetch_on_sale(count=35)
+    top = await fetch_top_sellers(count=15)
 
     # Merge sem duplicatas por steam_app_id
     seen = set()
@@ -28,6 +29,8 @@ async def sync_catalog():
         if g["steam_app_id"] not in seen:
             seen.add(g["steam_app_id"])
             games.append(g)
+
+    games = games[:MAX_CATALOG_SIZE]
 
     if not games:
         logger.warning("Scheduler: nenhum jogo retornado do catálogo.")
@@ -44,7 +47,7 @@ async def sync_catalog():
             db.add(Game(
                 title=g["title"],
                 steam_app_id=g["steam_app_id"],
-                nuuvem_slug=g["nuuvem_slug"]
+                nuuvem_slug=g["nuuvem_slug"]  # slug mantido, mas só consultado sob demanda agora
             ))
             added += 1
         await db.commit()
@@ -53,7 +56,9 @@ async def sync_catalog():
 
 
 async def fetch_all_prices():
-    logger.info("Scheduler: iniciando coleta de preços...")
+    """Atualiza preços da Steam para todos os jogos do catálogo. Nuuvem NÃO roda mais aqui —
+    é consultada sob demanda via GET /api/games/{id}/nuuvem-price quando o usuário abre o jogo."""
+    logger.info("Scheduler: iniciando coleta de preços (Steam)...")
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(Game))
         games = result.scalars().all()
@@ -73,21 +78,6 @@ async def fetch_all_prices():
                         db.add(PriceSnapshot(
                             game_id=game.id,
                             store="steam",
-                            price=data["price"],
-                            original_price=data["original_price"],
-                            discount_percent=data["discount_percent"],
-                            is_free=data["is_free"],
-                            captured_at=now
-                        ))
-
-                if game.nuuvem_slug:
-                    data = await get_nuuvem_price(game.nuuvem_slug)
-                    if data:
-                        if not game.cover_url and data.get("cover_url"):
-                            game.cover_url = data["cover_url"]
-                        db.add(PriceSnapshot(
-                            game_id=game.id,
-                            store="nuuvem",
                             price=data["price"],
                             original_price=data["original_price"],
                             discount_percent=data["discount_percent"],
