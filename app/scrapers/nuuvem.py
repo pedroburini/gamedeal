@@ -1,6 +1,8 @@
 import httpx
 from bs4 import BeautifulSoup
+import logging
 
+logger = logging.getLogger(__name__)
 
 NUUVEM_BASE = "https://www.nuuvem.com/br-en/item"
 
@@ -18,8 +20,10 @@ async def get_nuuvem_price(slug: str) -> dict | None:
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(url, headers=headers, timeout=10.0, follow_redirects=True)
+            logger.info(f"[nuuvem debug] slug={slug} status={resp.status_code} final_url={resp.url}")
             resp.raise_for_status()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[nuuvem debug] slug={slug} FALHOU NA REQUISICAO: {type(e).__name__}: {e}")
             return None
 
     soup = BeautifulSoup(resp.text, "html.parser")
@@ -28,11 +32,13 @@ async def get_nuuvem_price(slug: str) -> dict | None:
         # Preço atual — agora vem quebrado em spans separadas (integer + decimal)
         price_container = soup.select_one(".product-price--val")
         if not price_container:
+            logger.warning(f"[nuuvem debug] slug={slug} .product-price--val NAO ENCONTRADO no HTML (len={len(resp.text)})")
             return None
 
         integer_tag = price_container.select_one(".integer")
         decimal_tag = price_container.select_one(".decimal")
         if not integer_tag or not decimal_tag:
+            logger.warning(f"[nuuvem debug] slug={slug} .integer/.decimal nao encontrados dentro de .product-price--val")
             return None
 
         integer_part = integer_tag.get_text(strip=True)
@@ -73,5 +79,6 @@ async def get_nuuvem_price(slug: str) -> dict | None:
             "cover_url": cover_url
         }
 
-    except Exception:
+    except Exception as e:
+        logger.warning(f"[nuuvem debug] slug={slug} ERRO NO PARSING: {type(e).__name__}: {e}")
         return None
