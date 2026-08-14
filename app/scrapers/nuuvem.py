@@ -1,8 +1,11 @@
 import httpx
 from bs4 import BeautifulSoup
-import logging
 
-logger = logging.getLogger(__name__)
+# NOTA: a Nuuvem bloqueia (403) requisições vindas de IPs compartilhados de
+# provedores de hospedagem como Render — validado em ago/2026. O parsing abaixo
+# está correto e funciona se rodado de um IP não bloqueado; a limitação é de
+# infraestrutura (WAF/anti-bot), não de código. Ver decisão em [data]: optamos
+# por não usar proxy pago para contornar, já que a stack é 100% free-tier.
 
 NUUVEM_BASE = "https://www.nuuvem.com/br-en/item"
 
@@ -14,31 +17,30 @@ async def get_nuuvem_price(slug: str) -> dict | None:
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
             "Chrome/124.0.0.0 Safari/537.36"
-        )
+        ),
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+        "Referer": "https://www.google.com/",
     }
 
     async with httpx.AsyncClient() as client:
         try:
             resp = await client.get(url, headers=headers, timeout=10.0, follow_redirects=True)
-            logger.info(f"[nuuvem debug] slug={slug} status={resp.status_code} final_url={resp.url}")
             resp.raise_for_status()
-        except Exception as e:
-            logger.warning(f"[nuuvem debug] slug={slug} FALHOU NA REQUISICAO: {type(e).__name__}: {e}")
+        except Exception:
             return None
 
     soup = BeautifulSoup(resp.text, "html.parser")
 
     try:
-        # Preço atual — agora vem quebrado em spans separadas (integer + decimal)
+        # Preço atual — quebrado em spans separadas (integer + decimal)
         price_container = soup.select_one(".product-price--val")
         if not price_container:
-            logger.warning(f"[nuuvem debug] slug={slug} .product-price--val NAO ENCONTRADO no HTML (len={len(resp.text)})")
             return None
 
         integer_tag = price_container.select_one(".integer")
         decimal_tag = price_container.select_one(".decimal")
         if not integer_tag or not decimal_tag:
-            logger.warning(f"[nuuvem debug] slug={slug} .integer/.decimal nao encontrados dentro de .product-price--val")
             return None
 
         integer_part = integer_tag.get_text(strip=True)
@@ -79,6 +81,5 @@ async def get_nuuvem_price(slug: str) -> dict | None:
             "cover_url": cover_url
         }
 
-    except Exception as e:
-        logger.warning(f"[nuuvem debug] slug={slug} ERRO NO PARSING: {type(e).__name__}: {e}")
+    except Exception:
         return None
